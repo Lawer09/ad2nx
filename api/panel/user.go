@@ -156,7 +156,7 @@ func (c *Client) ReportNodeOnlineUsers(data *map[int][]string) error {
 
 // ReportNodeData 统一上报接口，替代 ReportUserTraffic + ReportNodeOnlineUsers
 func (c *Client) ReportNodeData(req *NodeReportRequest) error {
-	const path = "/api/v2/server/node/report"
+	const path = "/api/v2/server/report"
 	r, err := c.client.R().
 		SetBody(req).
 		ForceContentType("application/json").
