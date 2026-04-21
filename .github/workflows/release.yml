@@ -27,11 +27,11 @@ jobs:
             goarch: amd64
           - goos: linux
             goarch: arm64
-          - goos: linux
-            goarch: arm
-            goarm: 7
-          - goos: linux
-            goarch: 386
+        #   - goos: linux
+        #     goarch: arm
+        #     goarm: 7
+        #   - goos: linux
+        #     goarch: 386
           # 如需更多平台，取消下方注释
           # - goos: linux
           #   goarch: s390x
@@ -68,22 +68,33 @@ jobs:
           CGO_ENABLED: 0
         run: |
           mkdir -p build_assets
-          BINARY="${BINARY_NAME}-${GOOS}-${GOARCH}"
-          if [ -n "$GOARM" ]; then
-            BINARY="${BINARY}v${GOARM}"
-          fi
 
-          echo "Building ${BINARY}..."
-          go build -v -o "build_assets/${BINARY}" \
+          echo "Building ${BINARY_NAME}..."
+          go build -v -o "build_assets/${BINARY_NAME}" \
             -tags "${BUILD_TAGS}" \
             -trimpath \
             -ldflags "-X 'ad2nx/cmd.version=${{ steps.version.outputs.version }}' -s -w -buildid="
+
+      - name: Package zip
+        run: |
+          ARCHIVE="${BINARY_NAME}-${{ matrix.goos }}-${{ matrix.goarch }}"
+          if [ -n "${{ matrix.goarm }}" ]; then
+            ARCHIVE="${ARCHIVE}v${{ matrix.goarm }}"
+          fi
+
+          mkdir -p package
+          cp build_assets/${BINARY_NAME} package/
+          cp example/* package/
+
+          cd package
+          zip -r "../release/${ARCHIVE}.zip" .
+          cd ..
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: ${{ env.BINARY_NAME }}-${{ matrix.goos }}-${{ matrix.goarch }}${{ matrix.goarm && format('v{0}', matrix.goarm) || '' }}
-          path: build_assets/*
+          path: release/*.zip
 
   release:
     name: Create Release
@@ -116,11 +127,15 @@ jobs:
             ### Platforms
             | File | OS | Arch |
             |------|-----|------|
-            | `ad2nx-linux-amd64` | Linux | x86_64 |
-            | `ad2nx-linux-arm64` | Linux | ARM64 |
-            | `ad2nx-linux-armv7` | Linux | ARMv7 |
-            | `ad2nx-linux-386` | Linux | x86 |
-          files: release_assets/*
+            | `ad2nx-linux-amd64.zip` | Linux | x86_64 |
+            | `ad2nx-linux-arm64.zip` | Linux | ARM64 |
+
+            ### Zip Contents
+            - `ad2nx` — 二进制文件
+            - `config.json` / `dns.json` / `route.json` — 示例配置
+            - `custom_inbound.json` / `custom_outbound.json` — 自定义出入站示例
+            - `geoip.dat` / `geoip.db` / `geosite.dat` / `geosite.db` — GEO 数据文件
+          files: release_assets/*.zip
           draft: false
           prerelease: false
           generate_release_notes: true
