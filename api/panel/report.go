@@ -1,6 +1,6 @@
 package panel
 
-// NodeReportRequest 是 /api/v2/server/node/report 的请求体
+// NodeReportRequest 是 /api/v2/server/report 的请求体
 type NodeReportRequest struct {
 	// traffic: map[userID][upload, download]
 	Traffic map[int][]int64 `json:"traffic,omitempty"`
