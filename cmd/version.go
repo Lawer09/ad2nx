@@ -26,7 +26,7 @@ func init() {
 
 func showVersion() {
 	fmt.Println(`========= ad2nx Version:`)
-	fmt.Printf("%s %s (%s) ==========\n", codename, version, intro)
+	fmt.Printf("%s %s 1001 (%s) ==========\n", codename, version, intro)
 	//fmt.Printf("Supported cores: %s\n", strings.Join(vCore.RegisteredCore(), ", "))
 	// Warning
 	//fmt.Println(Warn("This version need board version >= 1.7.0."))
