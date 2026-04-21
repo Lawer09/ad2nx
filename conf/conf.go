@@ -1,13 +1,12 @@
 package conf
 
 import (
+	"encoding/json"
 	"fmt"
 	"io"
 	"os"
 
 	"ad2nx/common/json5"
-
-	"encoding/json/v2"
 )
 
 type Conf struct {
