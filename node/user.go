@@ -4,56 +4,86 @@ import (
 	"strconv"
 
 	"ad2nx/api/panel"
+	"ad2nx/common/sysinfo"
 
 	log "github.com/sirupsen/logrus"
 )
 
 func (c *Controller) reportUserTrafficTask() (err error) {
+	req := &panel.NodeReportRequest{}
+
+	// 1. 采集 traffic
 	userTraffic, _ := c.server.GetUserTrafficSlice(c.tag, true)
+	var totalUp, totalDown int64
 	if len(userTraffic) > 0 {
-		err = c.apiClient.ReportUserTraffic(userTraffic)
-		if err != nil {
-			log.WithFields(log.Fields{
-				"tag": c.tag,
-				"err": err,
-			}).Info("Report user traffic failed")
-		} else {
-			log.WithField("tag", c.tag).Infof("Report %d users traffic", len(userTraffic))
-			log.WithField("tag", c.tag).Debugf("User traffic: %+v", userTraffic)
+		req.Traffic = make(map[int][]int64, len(userTraffic))
+		for _, t := range userTraffic {
+			req.Traffic[t.UID] = []int64{t.Upload, t.Download}
+			totalUp += t.Upload
+			totalDown += t.Download
 		}
 	}
 
-	if onlineDevice, err := c.limiter.GetOnlineDevice(); err != nil {
-		log.Print(err)
-	} else if len(*onlineDevice) > 0 {
-		// Only report user has traffic > 100kb to allow ping test
-		var result []panel.OnlineUser
-		var nocountUID = make(map[int]struct{})
+	// 2. 采集 alive (在线 IP) 和 online (连接数)
+	if onlineDevice, err := c.limiter.GetOnlineDevice(); err == nil && len(*onlineDevice) > 0 {
+		// 过滤低流量用户（保留原有逻辑）
+		nocountUID := make(map[int]struct{})
 		for _, traffic := range userTraffic {
 			total := traffic.Upload + traffic.Download
 			if total < int64(c.Options.DeviceOnlineMinTraffic*1000) {
 				nocountUID[traffic.UID] = struct{}{}
 			}
 		}
-		for _, online := range *onlineDevice {
-			if _, ok := nocountUID[online.UID]; !ok {
-				result = append(result, online)
+
+		alive := make(map[int][]string)
+		online := make(map[int]int)
+		for _, ou := range *onlineDevice {
+			// online 统计所有连接数（不过滤）
+			online[ou.UID]++
+			// alive 过滤低流量用户
+			if _, skip := nocountUID[ou.UID]; !skip {
+				alive[ou.UID] = append(alive[ou.UID], ou.IP)
 			}
 		}
-		data := make(map[int][]string)
-		for _, onlineuser := range result {
-			// json structure: { UID1:["ip1","ip2"],UID2:["ip3","ip4"] }
-			data[onlineuser.UID] = append(data[onlineuser.UID], onlineuser.IP)
+		if len(alive) > 0 {
+			req.Alive = alive
 		}
-		if err = c.apiClient.ReportNodeOnlineUsers(&data); err != nil {
-			log.WithFields(log.Fields{
-				"tag": c.tag,
-				"err": err,
-			}).Info("Report online users failed")
-		} else {
-			log.WithField("tag", c.tag).Infof("Total %d online users, %d Reported", len(*onlineDevice), len(result))
-			log.WithField("tag", c.tag).Debugf("Online users: %+v", data)
+		if len(online) > 0 {
+			req.Online = online
 		}
+
+		log.WithField("tag", c.tag).Infof("Total %d online users, %d reported in alive",
+			len(*onlineDevice), len(alive))
+	}
+
+	// 3. 采集 status（CPU/Mem/Swap/Disk + 带宽）
+	interval := c.info.PushInterval.Seconds()
+	if interval <= 0 {
+		interval = 60 // fallback
+	}
+	status := sysinfo.GetNodeStatus()
+	status.InboundSpeed = int64(float64(totalUp) / interval)
+	status.OutboundSpeed = int64(float64(totalDown) / interval)
+	req.Status = status
+
+	// 4. 采集 metrics
+	activeUsers := len(userTraffic)
+	req.Metrics = sysinfo.GetNodeMetrics(
+		len(c.userList),
+		activeUsers,
+		status.InboundSpeed,
+		status.OutboundSpeed,
+	)
+
+	// 统一上报
+	if err = c.apiClient.ReportNodeData(req); err != nil {
+		log.WithFields(log.Fields{
+			"tag": c.tag,
+			"err": err,
+		}).Error("Report node data failed")
+	} else {
+		log.WithField("tag", c.tag).Infof("Report %d users traffic, speed: ↑%d ↓%d bytes/s",
+			len(userTraffic), status.InboundSpeed, status.OutboundSpeed)
 	}
 
 	userTraffic = nil

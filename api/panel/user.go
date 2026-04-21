@@ -153,3 +153,13 @@ func (c *Client) ReportNodeOnlineUsers(data *map[int][]string) error {
 
 	return nil
 }
+
+// ReportNodeData 统一上报接口，替代 ReportUserTraffic + ReportNodeOnlineUsers
+func (c *Client) ReportNodeData(req *NodeReportRequest) error {
+	const path = "/api/v2/server/node/report"
+	r, err := c.client.R().
+		SetBody(req).
+		ForceContentType("application/json").
+		Post(path)
+	return c.checkResponse(r, path, err)
+}
