@@ -82,7 +82,7 @@ jobs:
             ARCHIVE="${ARCHIVE}v${{ matrix.goarm }}"
           fi
 
-          mkdir -p package
+          mkdir -p package release
           cp build_assets/${BINARY_NAME} package/
           cp example/* package/
 
