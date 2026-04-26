@@ -10,6 +10,7 @@ import (
 	"github.com/shirou/gopsutil/v3/disk"
 	"github.com/shirou/gopsutil/v3/load"
 	"github.com/shirou/gopsutil/v3/mem"
+	"github.com/shirou/gopsutil/v3/net"
 )
 
 var startTime = time.Now()
@@ -72,6 +73,17 @@ func GetNodeMetrics(totalUsers, activeUsers int, inboundSpeed, outboundSpeed int
 		ActiveUsers:   activeUsers,
 		InboundSpeed:  inboundSpeed,
 		OutboundSpeed: outboundSpeed,
+	}
+
+	// TCP 连接数
+	if conns, err := net.Connections("tcp"); err == nil {
+		count := 0
+		for _, c := range conns {
+			if c.Status == "ESTABLISHED" {
+				count++
+			}
+		}
+		metrics.TcpConnections = count
 	}
 
 	// 每核 CPU 使用率

@@ -35,6 +35,7 @@ type NodeMetrics struct {
 	Goroutines        int         `json:"goroutines"`
 	ActiveConnections int         `json:"active_connections"`
 	TotalConnections  int64       `json:"total_connections"`
+	TcpConnections    int         `json:"tcp_connections"`
 	TotalUsers        int         `json:"total_users"`
 	ActiveUsers       int         `json:"active_users"`
 	InboundSpeed      int64       `json:"inbound_speed"`
